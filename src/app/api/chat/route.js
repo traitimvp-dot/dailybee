@@ -218,6 +218,25 @@ HƯỚNG DẪN HÀNH ĐỘNG:
       return NextResponse.json({ error: 'Chưa cấu hình API Key hợp lệ trong file .env.' }, { status: 500 });
     }
 
+    // Save user message and bot reply to Database for persistent chat history
+    try {
+      try {
+        await prisma.chatMessage.create({ data: { role: 'user', text: message.trim() } });
+      } catch (e) {
+        await prisma.$executeRaw`INSERT INTO ChatMessage (role, text, createdAt) VALUES ('user', ${message.trim()}, datetime('now'))`;
+      }
+
+      if (replyText) {
+        try {
+          await prisma.chatMessage.create({ data: { role: 'bot', text: replyText } });
+        } catch (e) {
+          await prisma.$executeRaw`INSERT INTO ChatMessage (role, text, createdAt) VALUES ('bot', ${replyText}, datetime('now'))`;
+        }
+      }
+    } catch (dbErr) {
+      console.warn('Failed to save chat message to DB:', dbErr.message);
+    }
+
     return NextResponse.json({
       success: true,
       reply: replyText,
@@ -290,9 +309,34 @@ export async function GET(request) {
 
     const total = expenses.reduce((sum, item) => sum + item.amount, 0);
 
-    return NextResponse.json({ expenses, total });
+    let chatMessages = [];
+    try {
+      chatMessages = await prisma.chatMessage.findMany({
+        orderBy: { createdAt: 'asc' },
+        take: 100
+      });
+    } catch (e) {
+      try {
+        chatMessages = await prisma.$queryRaw`SELECT id, role, text, createdAt FROM ChatMessage ORDER BY createdAt ASC LIMIT 100`;
+      } catch (err) {}
+    }
+
+    return NextResponse.json({ expenses, total, chatMessages });
   } catch (error) {
     console.error('Error fetching expenses:', error);
-    return NextResponse.json({ error: 'Không thể tải danh sách chi tiêu.' }, { status: 500 });
+    return NextResponse.json({ error: 'Không thể tải dữ liệu.' }, { status: 500 });
+  }
+}
+
+export async function DELETE() {
+  try {
+    try {
+      await prisma.chatMessage.deleteMany({});
+    } catch (e) {
+      await prisma.$executeRaw`DELETE FROM ChatMessage`;
+    }
+    return NextResponse.json({ success: true, message: 'Đã xóa toàn bộ lịch sử chat.' });
+  } catch (err) {
+    return NextResponse.json({ error: 'Không thể xóa lịch sử chat.' }, { status: 500 });
   }
 }

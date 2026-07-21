@@ -17,3 +17,11 @@ model Expense {
   category    String
   createdAt   DateTime @default(now())
 }
+
+model ChatMessage {
+  id        Int      @id @default(autoincrement())
+  role      String   // 'user' | 'bot'
+  text      String
+  createdAt DateTime @default(now())
+}
+

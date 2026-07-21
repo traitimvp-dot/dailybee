@@ -45,21 +45,35 @@ export default function Home() {
         if (data.total !== undefined) {
           setTotalExpense(data.total);
         }
-        if (data.expenses && data.expenses.length > 0) {
+        if (data.expenses) {
           setAllExpenses(data.expenses);
-          const loadedMsgs = data.expenses.slice(0, 5).reverse().map((exp) => ({
-            id: `hist-${exp.id}`,
-            role: 'bot',
-            text: `Đã lưu: **${exp.description}** - **${exp.amount.toLocaleString('vi-VN')}đ** (Danh mục: *${exp.category}*)`
-          }));
-          setMessages(prev => {
-            // Keep init message + loaded ones
-            return [prev[0], ...loadedMsgs];
-          });
+        }
+        if (data.chatMessages && data.chatMessages.length > 0) {
+          setMessages(data.chatMessages.map((msg) => ({
+            id: `msg-${msg.id}`,
+            role: msg.role === 'user' ? 'user' : 'bot',
+            text: msg.text
+          })));
         }
       }
     } catch (err) {
       console.error('Failed to load initial expenses:', err);
+    }
+  };
+
+  const handleClearChat = async () => {
+    if (!confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử trò chuyện không?')) return;
+    try {
+      const res = await fetch('/api/chat', { method: 'DELETE' });
+      if (res.ok) {
+        setMessages([{
+          id: 'init-1',
+          role: 'bot',
+          text: 'Chào bạn! Mình là AI ghi chép chi tiêu DailyBee. Hôm nay bạn đã chi tiêu gì, hãy nhắn cho mình nhé! (Ví dụ: "Sáng nay ăn phở 45k")'
+        }]);
+      }
+    } catch (e) {
+      console.error('Failed to clear chat:', e);
     }
   };
 
@@ -182,6 +196,10 @@ export default function Home() {
 
         <button className={styles.quotaBtn} onClick={handleCheckQuota} title="Kiểm tra hạn mức AI">
           ⚡ <span>Quota</span>
+        </button>
+
+        <button className={styles.quotaBtn} onClick={handleClearChat} title="Xóa lịch sử trò chuyện">
+          🗑️ <span>Xóa chat</span>
         </button>
       </header>
 
